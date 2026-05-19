@@ -649,6 +649,76 @@ class Parsedown
 
         $requiredIndent = ($Block['indent'] + strlen($Block['data']['marker']));
 
+        $text = isset($Line['text']) ? $Line['text'] : '';
+        $marker = isset($text[0]) ? $text[0] : '';
+        $isClosingMarker = false;
+
+        $inFencedCode = isset($Block['fencedCode']);
+
+        if ($marker === '`' || $marker === '~')
+        {
+            if (preg_match('/^([' . $marker . ']{3,})/', $text, $matches))
+            {
+                if ( ! $inFencedCode)
+                {
+                    if ($Line['indent'] >= $requiredIndent)
+                    {
+                        $infostring = trim(substr($text, strlen($matches[1])), "\t ");
+                        if ($marker === '~' || strpos($infostring, '`') === false)
+                        {
+                            $Block['fencedCode'] = array(
+                                'marker' => $matches[1],
+                                'indent' => $Line['indent'],
+                            );
+                            $inFencedCode = true;
+                        }
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+                else
+                {
+                    $openingMarker = $Block['fencedCode']['marker'];
+                    if ($marker === $openingMarker[0] && strlen($matches[1]) >= strlen($openingMarker))
+                    {
+                        if (chop(substr($text, strlen($matches[1])), ' ') === '')
+                        {
+                            $isClosingMarker = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($inFencedCode)
+        {
+            if (isset($Block['interrupted']))
+            {
+                for ($i = 0; $i < $Block['interrupted']; $i++)
+                {
+                    $Block['li']['handler']['argument'] []= '';
+                }
+
+                $Block['loose'] = true;
+                unset($Block['interrupted']);
+            }
+
+            $baseIndent = isset($Block['fencedCode']['indent']) ? $Block['fencedCode']['indent'] : $requiredIndent;
+            $body = isset($Line['body']) ? $Line['body'] : '';
+
+            $appendedText = preg_replace('/^[ ]{0,' . $baseIndent . '}/', '', $body);
+            $Block['li']['handler']['argument'] []= $appendedText;
+
+            if ($isClosingMarker)
+            {
+                unset($Block['fencedCode']);
+            }
+
+            return $Block;
+        }
+
         if ($Line['indent'] < $requiredIndent
             and (
                 (
